@@ -44,7 +44,7 @@ if post:
     col1, col2, col3 = st.columns(3)
     if col1.button("Save edits"):
         with db.get_conn() as conn:
-            conn.execute("UPDATE posts SET body_text = ? WHERE id = ?", (edited_text, post["id"]))
+            conn.execute("UPDATE posts SET body_text = %s WHERE id = %s", (edited_text, post["id"]))
         st.success("Saved.")
     if col2.button("Approve (ready to post)"):
         db.update_post_status(post["id"], "approved")

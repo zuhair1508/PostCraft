@@ -25,7 +25,8 @@ Use the sidebar to navigate.
 )
 
 st.info(
-    "First time here? Copy `.env.example` to `.env` and add your `OPENROUTER_API_KEY` before "
-    "using the Content Generator or Outreach pages. Text generation runs on an open-weight model "
-    "(Llama 3.3 70B by default) via OpenRouter — swap `OPENROUTER_MODEL` in `.env` to try another."
+    "First time here? Copy `.env.example` to `.env` and fill in `DATABASE_URL` (a free Postgres "
+    "instance from Supabase or Neon) and `OPENROUTER_API_KEY` before using this app. Text "
+    "generation runs on an open-weight model (Llama 3.3 70B by default) via OpenRouter — swap "
+    "`OPENROUTER_MODEL` in `.env` to try another."
 )

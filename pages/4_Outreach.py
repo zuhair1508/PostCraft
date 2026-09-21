@@ -38,7 +38,7 @@ if draft:
     if col1.button("Save edits"):
         with db.get_conn() as conn:
             conn.execute(
-                "UPDATE outreach_drafts SET message_text = ? WHERE id = ?", (edited, draft["id"])
+                "UPDATE outreach_drafts SET message_text = %s WHERE id = %s", (edited, draft["id"])
             )
         st.success("Saved. Copy this into LinkedIn yourself when ready.")
     if col2.button("Mark as sent"):
