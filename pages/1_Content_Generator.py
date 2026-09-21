@@ -1,6 +1,6 @@
 import streamlit as st
 
-from core import content_gen, db, infographic_gen
+from core import content_gen, db, infographic_fields, infographic_gen
 
 st.set_page_config(page_title="Content Generator", layout="wide")
 st.title("Content Generator")
@@ -62,25 +62,69 @@ if post:
         template_name = st.selectbox(
             "Template", ["stat_callout", "before_after", "checklist", "quote_card"]
         )
+
+        def _field_key(name: str) -> str:
+            return f"tpl_{template_name}_{name}_{post['id']}"
+
+        _DEFAULTS = {
+            "stat_callout": {
+                "eyebrow": "WORKFLOW COST", "stat": "20hrs/wk",
+                "label": "spent manually copying invoice data",
+                "footer": "That's not a staffing problem.",
+            },
+            "before_after": {
+                "eyebrow": "WORKFLOW REDESIGN", "title": "Invoice processing",
+                "before": "Manual entry across 3 systems, 2-day delay.",
+                "after": "Automated extraction + review queue, same-day.",
+            },
+            "checklist": {
+                "eyebrow": "BEFORE YOU AUTOMATE", "title": "Questions to ask first",
+                "items": "Is this rule-based or judgment-based?\nHow often does it change?\nWhat's the cost of an error?",
+            },
+            "quote_card": {
+                "quote": "Most companies don't have an AI problem. They have a workflow problem.",
+                "attribution": "",
+            },
+        }[template_name]
+
+        for name, default in _DEFAULTS.items():
+            st.session_state.setdefault(_field_key(name), default)
+
+        if st.button("Suggest fields from this post"):
+            try:
+                with st.spinner("Reading the post for infographic-worthy content..."):
+                    suggested = infographic_fields.suggest_fields(
+                        template_name, post["body_text"], post["topic"]
+                    )
+                for name in _DEFAULTS:
+                    if name in suggested:
+                        value = suggested[name]
+                        if name == "items" and isinstance(value, list):
+                            value = "\n".join(value)
+                        st.session_state[_field_key(name)] = value
+                st.rerun()
+            except Exception as e:
+                st.error(f"Couldn't suggest fields from the post: {e}")
+
         fields = {}
         if template_name == "stat_callout":
-            fields["eyebrow"] = st.text_input("Eyebrow label", "WORKFLOW COST")
-            fields["stat"] = st.text_input("Big stat", "20hrs/wk")
-            fields["label"] = st.text_input("Label", "spent manually copying invoice data")
-            fields["footer"] = st.text_input("Footer", "That's not a staffing problem.")
+            fields["eyebrow"] = st.text_input("Eyebrow label", key=_field_key("eyebrow"))
+            fields["stat"] = st.text_input("Big stat", key=_field_key("stat"))
+            fields["label"] = st.text_input("Label", key=_field_key("label"))
+            fields["footer"] = st.text_input("Footer", key=_field_key("footer"))
         elif template_name == "before_after":
-            fields["eyebrow"] = st.text_input("Eyebrow label", "WORKFLOW REDESIGN")
-            fields["title"] = st.text_input("Title", "Invoice processing")
-            fields["before"] = st.text_area("Before", "Manual entry across 3 systems, 2-day delay.")
-            fields["after"] = st.text_area("After", "Automated extraction + review queue, same-day.")
+            fields["eyebrow"] = st.text_input("Eyebrow label", key=_field_key("eyebrow"))
+            fields["title"] = st.text_input("Title", key=_field_key("title"))
+            fields["before"] = st.text_area("Before", key=_field_key("before"))
+            fields["after"] = st.text_area("After", key=_field_key("after"))
         elif template_name == "checklist":
-            fields["eyebrow"] = st.text_input("Eyebrow label", "BEFORE YOU AUTOMATE")
-            fields["title"] = st.text_input("Title", "Questions to ask first")
-            items_raw = st.text_area("Items (one per line)", "Is this rule-based or judgment-based?\nHow often does it change?\nWhat's the cost of an error?")
+            fields["eyebrow"] = st.text_input("Eyebrow label", key=_field_key("eyebrow"))
+            fields["title"] = st.text_input("Title", key=_field_key("title"))
+            items_raw = st.text_area("Items (one per line)", key=_field_key("items"))
             fields["items"] = [i.strip() for i in items_raw.splitlines() if i.strip()]
         elif template_name == "quote_card":
-            fields["quote"] = st.text_area("Quote", "Most companies don't have an AI problem. They have a workflow problem.")
-            fields["attribution"] = st.text_input("Attribution", "")
+            fields["quote"] = st.text_area("Quote", key=_field_key("quote"))
+            fields["attribution"] = st.text_input("Attribution", key=_field_key("attribution"))
 
         if st.button("Render templated infographic"):
             with st.spinner("Rendering..."):
