@@ -91,7 +91,7 @@ if post:
             "Visual concept (abstract/metaphorical, not literal business photography)",
             "A tangled cable being reorganized into a clean grid, minimalist, dark blue and teal palette",
         )
-        st.caption("Requires IMAGE_GEN_API_KEY in .env.")
+        st.caption("Requires OPENROUTER_API_KEY and IMAGE_GEN_MODEL in .env.")
         if st.button("Generate AI infographic"):
             try:
                 with st.spinner("Generating..."):
