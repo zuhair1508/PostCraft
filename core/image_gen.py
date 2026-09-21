@@ -44,7 +44,12 @@ def _call_provider(prompt: str) -> bytes:
         json={"model": model, "prompt": prompt, "output_format": "png"},
         timeout=60,
     )
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(
+            f"OpenRouter image request failed ({response.status_code}): {response.text}"
+        ) from e
     data = response.json()
     return base64.b64decode(data["data"][0]["b64_json"])
 
