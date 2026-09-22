@@ -101,10 +101,17 @@ def _call_anthropic(prompt: str) -> bytes:
             if file_ref.type == "bash_code_execution_output" and file_ref.file_id:
                 file_id = file_ref.file_id  # last file wins if it produced more than one
 
+    print(
+        f"[image_gen] anthropic stop_reason={response.stop_reason!r} "
+        f"block_types={[b.type for b in response.content]!r} file_id={file_id!r}"
+    )
+
     if not file_id:
+        explanation = " ".join(b.text for b in response.content if b.type == "text").strip()
+        detail = f" Claude said: {explanation}" if explanation else ""
         raise RuntimeError(
-            "Claude didn't produce an image file. Try rephrasing the visual concept and "
-            "generating again."
+            f"Claude didn't produce an image file (stop_reason={response.stop_reason}). "
+            f"Try rephrasing the visual concept and generating again.{detail}"
         )
 
     return client.files.download(file_id).read()

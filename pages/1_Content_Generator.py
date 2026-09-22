@@ -151,8 +151,8 @@ if post:
             )
         if st.button("Generate AI infographic"):
             try:
-                with st.spinner("Generating..."):
+                with st.spinner("Generating... this can take a minute or two for the Anthropic provider."):
                     path = infographic_gen.attach_ai_infographic(post["id"], concept_prompt, provider=provider)
                 st.image(str(path))
-            except RuntimeError as e:
-                st.error(str(e))
+            except Exception as e:
+                st.error(f"{type(e).__name__}: {e}")
