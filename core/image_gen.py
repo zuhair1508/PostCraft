@@ -68,7 +68,7 @@ def _call_anthropic(prompt: str) -> bytes:
     from anthropic import Anthropic, APIStatusError  # lazy: optional dependency
 
     client = Anthropic(api_key=api_key)
-    model = os.environ.get("ANTHROPIC_IMAGE_MODEL", DEFAULT_ANTHROPIC_MODEL)
+    model = os.environ.get("ANTHROPIC_IMAGE_MODEL") or DEFAULT_ANTHROPIC_MODEL
 
     instructions = (
         "Using the Python code execution tool (matplotlib and/or Pillow), draw a minimalist, "
