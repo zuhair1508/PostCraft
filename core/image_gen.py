@@ -65,7 +65,7 @@ def _call_anthropic(prompt: str) -> bytes:
             "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and fill it in."
         )
 
-    from anthropic import Anthropic  # lazy: optional dependency
+    from anthropic import Anthropic, APIStatusError  # lazy: optional dependency
 
     client = Anthropic(api_key=api_key)
     model = os.environ.get("ANTHROPIC_IMAGE_MODEL", DEFAULT_ANTHROPIC_MODEL)
@@ -79,12 +79,16 @@ def _call_anthropic(prompt: str) -> bytes:
         "directory. Make reasonable creative choices yourself rather than asking questions."
     )
 
-    response = client.messages.create(
-        model=model,
-        max_tokens=8000,
-        tools=[{"type": "code_execution_20260521", "name": "code_execution"}],
-        messages=[{"role": "user", "content": instructions}],
-    )
+    try:
+        response = client.beta.messages.create(
+            model=model,
+            max_tokens=8000,
+            betas=["code-execution-2025-08-25"],
+            tools=[{"type": "code_execution_20260521", "name": "code_execution"}],
+            messages=[{"role": "user", "content": instructions}],
+        )
+    except APIStatusError as e:
+        raise RuntimeError(f"Anthropic request failed ({e.status_code}): {e.message}") from e
 
     file_id = None
     for block in response.content:
@@ -103,7 +107,7 @@ def _call_anthropic(prompt: str) -> bytes:
             "generating again."
         )
 
-    return client.beta.files.download(file_id).read()
+    return client.files.download(file_id).read()
 
 
 _PROVIDERS = {
