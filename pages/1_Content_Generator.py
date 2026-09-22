@@ -135,11 +135,24 @@ if post:
             "Visual concept (abstract/metaphorical, not literal business photography)",
             "A tangled cable being reorganized into a clean grid, minimalist, dark blue and teal palette",
         )
-        st.caption("Requires OPENROUTER_API_KEY and IMAGE_GEN_MODEL in .env.")
+        provider_label = st.radio(
+            "Provider",
+            ["OpenRouter (dedicated image model)", "Anthropic (Claude draws it via code execution)"],
+            horizontal=True,
+        )
+        provider = "openrouter" if provider_label.startswith("OpenRouter") else "anthropic"
+        if provider == "openrouter":
+            st.caption("Requires OPENROUTER_API_KEY and IMAGE_GEN_MODEL in .env.")
+        else:
+            st.caption(
+                "Requires ANTHROPIC_API_KEY in .env. Claude writes matplotlib/Pillow code to "
+                "draw the illustration — slower and less photorealistic than a dedicated image "
+                "model, but no separate image-model subscription needed."
+            )
         if st.button("Generate AI infographic"):
             try:
                 with st.spinner("Generating..."):
-                    path = infographic_gen.attach_ai_infographic(post["id"], concept_prompt)
+                    path = infographic_gen.attach_ai_infographic(post["id"], concept_prompt, provider=provider)
                 st.image(str(path))
             except RuntimeError as e:
                 st.error(str(e))

@@ -1,5 +1,6 @@
 streamlit>=1.38
 openai>=1.40
+anthropic>=0.40
 httpx>=0.27
 psycopg[binary]>=3.2
 pillow>=10.4
@@ -8,5 +9,7 @@ python-dotenv>=1.0
 
 # Note: `openai` is used as an OpenAI-compatible client for OpenRouter (text generation).
 # `httpx` is used directly for OpenRouter's Image API (AI-generated infographics).
+# `anthropic` is the optional Anthropic-provider path for AI-generated infographics
+# (IMAGE_GEN_PROVIDER=anthropic) — only needed if you use that provider.
 # `psycopg[binary]` is the Postgres driver (data/leads/posts storage) — binary build avoids
 # needing system libpq headers installed.

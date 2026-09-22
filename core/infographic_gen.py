@@ -12,9 +12,9 @@ def attach_templated_infographic(post_id: int, template_name: str, fields: dict)
     return path
 
 
-def attach_ai_infographic(post_id: int, concept_prompt: str) -> Path:
+def attach_ai_infographic(post_id: int, concept_prompt: str, provider: str | None = None) -> Path:
     from core.image_gen import generate_illustrative_image  # lazy: optional dependency
 
-    path = generate_illustrative_image(concept_prompt)
+    path = generate_illustrative_image(concept_prompt, provider=provider)
     db.set_post_infographic(post_id, str(path), infographic_type="ai_generated")
     return path

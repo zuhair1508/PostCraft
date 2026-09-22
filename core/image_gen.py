@@ -1,11 +1,14 @@
 """AI-generated illustrative infographics for thought-leadership posts.
 
-Uses OpenRouter's unified Image API (https://openrouter.ai/docs/features/images), the same
-OPENROUTER_API_KEY already used for text generation — no separate provider/key needed. Set
-IMAGE_GEN_MODEL to any image-capable model slug from
-https://openrouter.ai/models?output_modalities=image. OpenRouter's catalog mixes open-weight and
-proprietary models and changes over time, so check that page for licensing before picking one if
-an open-weight model matters to you.
+Two interchangeable providers, selected via IMAGE_GEN_PROVIDER (default "openrouter"):
+
+- "openrouter": OpenRouter's unified Image API (https://openrouter.ai/docs/features/images),
+  the same OPENROUTER_API_KEY already used for text generation. Set IMAGE_GEN_MODEL to any
+  image-capable model slug from https://openrouter.ai/models?output_modalities=image.
+- "anthropic": Claude (ANTHROPIC_API_KEY) drawing the illustration itself with the code
+  execution tool (matplotlib/Pillow), since the Messages API has no native image-output
+  endpoint. Slower and less photorealistic than a dedicated image model, but needs no
+  separate image-model subscription if you already have Claude API access.
 """
 
 import base64
@@ -20,9 +23,10 @@ load_dotenv()
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "generated"
 IMAGES_ENDPOINT = "https://openrouter.ai/api/v1/images"
+DEFAULT_ANTHROPIC_MODEL = "claude-opus-5"
 
 
-def _call_provider(prompt: str) -> bytes:
+def _call_openrouter(prompt: str) -> bytes:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError(
@@ -54,14 +58,78 @@ def _call_provider(prompt: str) -> bytes:
     return base64.b64decode(data["data"][0]["b64_json"])
 
 
-def generate_illustrative_image(concept_prompt: str) -> Path:
+def _call_anthropic(prompt: str) -> bytes:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and fill it in."
+        )
+
+    from anthropic import Anthropic  # lazy: optional dependency
+
+    client = Anthropic(api_key=api_key)
+    model = os.environ.get("ANTHROPIC_IMAGE_MODEL", DEFAULT_ANTHROPIC_MODEL)
+
+    instructions = (
+        "Using the Python code execution tool (matplotlib and/or Pillow), draw a minimalist, "
+        "professional abstract illustration for a LinkedIn infographic. It must be a wordless, "
+        "conceptual/metaphorical graphic — no readable text, letters, or data labels — matching "
+        f"this visual concept:\n\n{prompt}\n\n"
+        "Render at 1200x1200px and save the final image as a single PNG file in the working "
+        "directory. Make reasonable creative choices yourself rather than asking questions."
+    )
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=8000,
+        tools=[{"type": "code_execution_20260521", "name": "code_execution"}],
+        messages=[{"role": "user", "content": instructions}],
+    )
+
+    file_id = None
+    for block in response.content:
+        if block.type != "bash_code_execution_tool_result":
+            continue
+        result = block.content
+        if getattr(result, "type", None) != "bash_code_execution_result" or not result.content:
+            continue
+        for file_ref in result.content:
+            if file_ref.type == "bash_code_execution_output" and file_ref.file_id:
+                file_id = file_ref.file_id  # last file wins if it produced more than one
+
+    if not file_id:
+        raise RuntimeError(
+            "Claude didn't produce an image file. Try rephrasing the visual concept and "
+            "generating again."
+        )
+
+    return client.beta.files.download(file_id).read()
+
+
+_PROVIDERS = {
+    "openrouter": _call_openrouter,
+    "anthropic": _call_anthropic,
+}
+
+
+def generate_illustrative_image(concept_prompt: str, provider: str | None = None) -> Path:
     """Generate a conceptual/illustrative image for a thought-leadership post.
 
     `concept_prompt` should describe the visual metaphor, not restate the post text verbatim —
     keep it abstract/professional (e.g. "a tangled cable being reorganized into a clean grid,
     minimalist, dark blue and teal palette") rather than literal business photography.
+
+    `provider` is "openrouter" or "anthropic"; defaults to IMAGE_GEN_PROVIDER (env), then
+    "openrouter".
     """
-    image_bytes = _call_provider(concept_prompt)
+    provider = provider or os.environ.get("IMAGE_GEN_PROVIDER", "openrouter")
+    call = _PROVIDERS.get(provider)
+    if call is None:
+        raise RuntimeError(
+            f"Unknown IMAGE_GEN_PROVIDER {provider!r}. Choose one of: {', '.join(_PROVIDERS)}."
+        )
+
+    image_bytes = call(concept_prompt)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / f"ai_image_{uuid.uuid4().hex[:8]}.png"
     out_path.write_bytes(image_bytes)
