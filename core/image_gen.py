@@ -1,10 +1,13 @@
 """AI-generated illustrative infographics for thought-leadership posts.
 
-Two interchangeable providers, selected via IMAGE_GEN_PROVIDER (default "openrouter"):
+Three interchangeable providers, selected via IMAGE_GEN_PROVIDER (default "openrouter"):
 
 - "openrouter": OpenRouter's unified Image API (https://openrouter.ai/docs/features/images),
   the same OPENROUTER_API_KEY already used for text generation. Set IMAGE_GEN_MODEL to any
   image-capable model slug from https://openrouter.ai/models?output_modalities=image.
+- "together": Together AI (https://www.together.ai) serving open-weight image models
+  directly — default is FLUX.1 [schnell] (Apache 2.0, black-forest-labs) on its free
+  endpoint. Requires TOGETHER_API_KEY.
 - "anthropic": Claude (ANTHROPIC_API_KEY) drawing the illustration itself with the code
   execution tool (matplotlib/Pillow), since the Messages API has no native image-output
   endpoint. Slower and less photorealistic than a dedicated image model, but needs no
@@ -23,7 +26,9 @@ load_dotenv()
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "generated"
 IMAGES_ENDPOINT = "https://openrouter.ai/api/v1/images"
+TOGETHER_IMAGES_ENDPOINT = "https://api.together.ai/v1/images/generations"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-5"
+DEFAULT_TOGETHER_MODEL = "black-forest-labs/FLUX.1-schnell-Free"
 
 
 def _call_openrouter(prompt: str) -> bytes:
@@ -53,6 +58,44 @@ def _call_openrouter(prompt: str) -> bytes:
     except httpx.HTTPStatusError as e:
         raise RuntimeError(
             f"OpenRouter image request failed ({response.status_code}): {response.text}"
+        ) from e
+    data = response.json()
+    return base64.b64decode(data["data"][0]["b64_json"])
+
+
+def _call_together(prompt: str) -> bytes:
+    api_key = os.environ.get("TOGETHER_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "TOGETHER_API_KEY is not set. Sign up at https://api.together.ai and copy "
+            ".env.example to .env and fill it in."
+        )
+
+    model = os.environ.get("TOGETHER_IMAGE_MODEL") or DEFAULT_TOGETHER_MODEL
+    # schnell is a distilled few-step model — more steps than this just burns time/quota
+    # without improving quality. Override TOGETHER_IMAGE_STEPS if you switch to a non-schnell
+    # model that benefits from more.
+    steps = int(os.environ.get("TOGETHER_IMAGE_STEPS", "4"))
+
+    response = httpx.post(
+        TOGETHER_IMAGES_ENDPOINT,
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "model": model,
+            "prompt": prompt,
+            "width": 1024,
+            "height": 1024,
+            "steps": steps,
+            "n": 1,
+            "response_format": "base64",
+        },
+        timeout=60,
+    )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(
+            f"Together AI image request failed ({response.status_code}): {response.text}"
         ) from e
     data = response.json()
     return base64.b64decode(data["data"][0]["b64_json"])
@@ -119,6 +162,7 @@ def _call_anthropic(prompt: str) -> bytes:
 
 _PROVIDERS = {
     "openrouter": _call_openrouter,
+    "together": _call_together,
     "anthropic": _call_anthropic,
 }
 
@@ -130,8 +174,8 @@ def generate_illustrative_image(concept_prompt: str, provider: str | None = None
     keep it abstract/professional (e.g. "a tangled cable being reorganized into a clean grid,
     minimalist, dark blue and teal palette") rather than literal business photography.
 
-    `provider` is "openrouter" or "anthropic"; defaults to IMAGE_GEN_PROVIDER (env), then
-    "openrouter".
+    `provider` is "openrouter", "together", or "anthropic"; defaults to IMAGE_GEN_PROVIDER
+    (env), then "openrouter".
     """
     provider = provider or os.environ.get("IMAGE_GEN_PROVIDER", "openrouter")
     call = _PROVIDERS.get(provider)

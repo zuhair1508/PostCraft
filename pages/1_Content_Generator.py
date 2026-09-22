@@ -137,12 +137,25 @@ if post:
         )
         provider_label = st.radio(
             "Provider",
-            ["OpenRouter (dedicated image model)", "Anthropic (Claude draws it via code execution)"],
+            [
+                "OpenRouter (dedicated image model)",
+                "Together AI (open-source FLUX model)",
+                "Anthropic (Claude draws it via code execution)",
+            ],
             horizontal=True,
         )
-        provider = "openrouter" if provider_label.startswith("OpenRouter") else "anthropic"
+        provider = {
+            "OpenRouter (dedicated image model)": "openrouter",
+            "Together AI (open-source FLUX model)": "together",
+            "Anthropic (Claude draws it via code execution)": "anthropic",
+        }[provider_label]
         if provider == "openrouter":
             st.caption("Requires OPENROUTER_API_KEY and IMAGE_GEN_MODEL in .env.")
+        elif provider == "together":
+            st.caption(
+                "Requires TOGETHER_API_KEY in .env. Uses FLUX.1 [schnell] (open-weight, "
+                "Apache 2.0) by default — override with TOGETHER_IMAGE_MODEL."
+            )
         else:
             st.caption(
                 "Requires ANTHROPIC_API_KEY in .env. Claude writes matplotlib/Pillow code to "
